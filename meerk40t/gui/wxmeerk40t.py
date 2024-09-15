@@ -471,7 +471,7 @@ class wxMeerK40t(wx.App, Module):
         # Set the delay after which the tooltip appears.
         self.context.setting(int, "tooltip_delay", 100)
         autopop_ms = self.context.tooltip_autopop
-        delay_ms = self.context.tooltip_delay
+        delay_ms = 1500 #self.context.tooltip_delay
         wx.ToolTip.SetAutoPop(autopop_ms)
         wx.ToolTip.SetDelay(delay_ms)
         wx.ToolTip.SetReshow(0)
