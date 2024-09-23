@@ -473,8 +473,8 @@ class wxMeerK40t(wx.App, Module):
         autopop_ms = self.context.tooltip_autopop
         delay_ms = 1500 #self.context.tooltip_delay
         wx.ToolTip.SetAutoPop(autopop_ms)
-        wx.ToolTip.SetDelay(delay_ms)
-        wx.ToolTip.SetReshow(0)
+        wx.ToolTip.SetDelay(1500)
+        wx.ToolTip.SetReshow(1500) #There's a bug with this
 
     def on_app_close(self, event=None):
         try:
