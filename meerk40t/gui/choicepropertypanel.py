@@ -125,7 +125,6 @@ class ChoicePropertyPanel(ScrolledPanel):
         self.context = context
         self.listeners = list()
         self.entries_per_column = entries_per_column
-        self._detached = False
         if choices is None:
             return
         if isinstance(choices, str):
@@ -1162,12 +1161,16 @@ class ChoicePropertyPanel(ScrolledPanel):
                 current_sizer.Add(chart, expansion_flag * weight, wx.EXPAND, 0)
             elif data_type in (str, int, float):
                 # str, int, and float type objects get a TextCtrl setter.
-                if label != "":
+                if label != "" and data_style != "flat":
                     control_sizer = StaticBoxSizer(
                         self, wx.ID_ANY, label, wx.HORIZONTAL
                     )
                 else:
                     control_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                    if label != "":
+                        label_text = wx.StaticText(self, id=wx.ID_ANY, label=label)
+                        control_sizer.Add(label_text, 0, wx.ALIGN_CENTER_VERTICAL, 0)
+
                 if data_type == int:
                     check_flag = "int"
                     limit = True
@@ -1574,23 +1577,27 @@ class ChoicePropertyPanel(ScrolledPanel):
         return result
 
     def reload(self):
-        if not self._detached:
-            for attr, listener, obj in self.listeners:
-                try:
-                    value = getattr(obj, attr)
-                except AttributeError as e:
-                    print(f"error: {e}")
-                    continue
-                listener("internal", value, obj)
+        for attr, listener, obj in self.listeners:
+            try:
+                value = getattr(obj, attr)
+            except AttributeError as e:
+                # print(f"error: {e}")
+                continue
+            listener("internal", value, obj)
 
     def module_close(self, *args, **kwargs):
         self.pane_hide()
 
     def pane_hide(self):
-        if not self._detached:
+        # print (f"hide called: {len(self.listeners)}")
+        if len(self.listeners):
             for attr, listener, obj in self.listeners:
                 self.context.unlisten(attr, listener)
-            self._detached = True
+                del listener
+            self.listeners.clear()
 
     def pane_show(self):
+        # print ("show called")
+        # if len(self.listeners) == 0:
+        #     print ("..but no one cares")
         pass

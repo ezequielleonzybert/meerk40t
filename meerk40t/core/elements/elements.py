@@ -521,6 +521,9 @@ class Elemental(Service):
         self.points = list()
         self.segments = list()
 
+        # Will be filled with a list of newly added nodes after a load operation
+        self.added_elements = list()
+
         self.undo = Undo(self, self._tree)
         self.do_undo = True
         self.suppress_updates = False
@@ -565,7 +568,8 @@ class Elemental(Service):
                 self.load_default(performclassify=False)
             if list(self.ops()):
                 # Something was loaded for default ops. Mark that.
-                self.undo.mark("op-loaded")  # Mark defaulted
+                # Hint for translate check: _("Operations restored")
+                self.undo.mark("Operations restored")  # Mark defaulted
 
         self._default_stroke = None
         self._default_strokewidth = None
@@ -640,7 +644,7 @@ class Elemental(Service):
         self._tree.notify_frozen(True)
 
     def resume_visual_updates(self):
-        self._tree.notify_frozen(False)     
+        self._tree.notify_frozen(False)
 
     def stop_updates(self, source, stop_notify=False):
         # print (f"Stop update called from {source}")
@@ -1674,8 +1678,9 @@ class Elemental(Service):
 
     # ------------------------------------------------------------------------
 
-    def prepare_undo(self):
+    def prepare_undo(self, message=None):
         if self.do_undo:
+            self.undo.message = message
             self.schedule(self._save_restore_job)
 
     def emphasized(self, *args):
@@ -1687,13 +1692,15 @@ class Elemental(Service):
         self._emphasized_bounds_dirty = True
         self._emphasized_bounds = None
         self._emphasized_bounds_painted = None
-        self.prepare_undo()
+        # Hint for translate check: _("Element altered")
+        self.prepare_undo("Element altered")
 
     def modified(self, *args):
         self._emphasized_bounds_dirty = True
         self._emphasized_bounds = None
         self._emphasized_bounds_painted = None
-        self.prepare_undo()
+        # Hint for translate check: _("Element modified")
+        self.prepare_undo("Element modified")
 
     def translated(self, node=None, dx=0, dy=0, *args):
         # It's safer to just recompute the selection area
@@ -1702,7 +1709,8 @@ class Elemental(Service):
         self._emphasized_bounds_dirty = True
         self._emphasized_bounds = None
         self._emphasized_bounds_painted = None
-        self.prepare_undo()
+        # Hint for translate check: _("Element shifted")
+        self.prepare_undo("Element shifted")
 
     def scaled(self, node=None, sx=1, sy=1, ox=0, oy=0, *args):
         # It's safer to just recompute the selection area
@@ -1711,13 +1719,16 @@ class Elemental(Service):
         self._emphasized_bounds_dirty = True
         self._emphasized_bounds = None
         self._emphasized_bounds_painted = None
-        self.prepare_undo()
+        # Hint for translate check: _("Element scaled")
+        self.prepare_undo("Element scaled")
 
     def node_attached(self, node, **kwargs):
-        self.prepare_undo()
+        # Hint for translate check: _("Element added")
+        self.prepare_undo("Element added")
 
     def node_detached(self, node, **kwargs):
-        self.prepare_undo()
+        # Hint for translate check: _("Element deleted")
+        self.prepare_undo("Element deleted")
 
     def listen_tree(self, listener):
         self._tree.listen(listener)
@@ -3874,6 +3885,10 @@ class Elemental(Service):
     def load(self, pathname, **kwargs):
         kernel = self.kernel
         _ = kernel.translation
+
+        _stored_elements = list(e for e in self.elems_nodes())
+        self.clear_loaded_information()
+
         filename_to_process = pathname
         # Let's check first if we have a preprocessor
         # Use-case: if we identify functionalities in the file
@@ -3917,6 +3932,9 @@ class Elemental(Service):
                             opcount_now = self.count_op()
                             self.remove_invalid_references()
                             self.remove_empty_groups()
+                            for e in self.elems_nodes():
+                                if e not in _stored_elements:
+                                    self.added_elements.append(e)
                             # self.listen_tree(self)
                             self._filename = pathname
                             self.set_end_time("load", display=True)
@@ -3946,6 +3964,9 @@ class Elemental(Service):
                             return False
 
         return False
+
+    def clear_loaded_information(self):
+        self.added_elements.clear()
 
     def load_types(self, all=True):
         kernel = self.kernel

@@ -9,6 +9,7 @@ import wx
 from PIL import Image
 from wx import aui
 
+from meerk40t.main import APPLICATION_NAME
 from meerk40t.core.exceptions import BadFileError
 from meerk40t.gui.gui_mixins import FormatPainter, Warnings
 from meerk40t.gui.statusbarwidgets.defaultoperations import DefaultOperationWidget
@@ -123,7 +124,7 @@ from .laserrender import (
 from .mwindow import MWindow
 
 _ = wx.GetTranslation
-
+MULTIPLE = "<Multiple files loaded>"
 
 class Autosaver:
     """
@@ -272,8 +273,7 @@ class MeerK40t(MWindow):
         self.DragAcceptFiles(True)
 
         self.needs_saving = False
-        self.working_file = None
-        self.files_loaded = 0
+        self.working_files = list()
 
         self.pipe_state = None
         self.previous_position = None
@@ -528,6 +528,9 @@ class MeerK40t(MWindow):
                     dlg.Destroy()
 
             def paste_text(content):
+                if content.startswith("http://") or content.startswith("https://"):
+                    self.context(f"webimage {content}\n")
+                    return
                 size = 16.0
                 node = self.context.elements.elem_branch.add(
                     text=content,
@@ -1047,6 +1050,7 @@ class MeerK40t(MWindow):
                 "default": 0.1,
                 "trailer": "x",
                 "type": float,
+                "style": "flat",
                 "label": _("Default zoom factor:"),
                 "tip": _(
                     "Default zoom factor controls how quick or fast zooming happens."
@@ -1060,6 +1064,7 @@ class MeerK40t(MWindow):
                 "default": 25.0,
                 "trailer": "px",
                 "type": float,
+                "style": "flat",
                 "label": _("Default pan factor:"),
                 "tip": _("Default pan factor controls how quick panning happens."),
                 "page": "Gui",
@@ -2097,12 +2102,26 @@ class MeerK40t(MWindow):
         #         > 0,
         #     },
         # )
+        def undo_tip():
+            s = _("Undo last operation")
+            t = kernel.elements.undo.undo_string()
+            if t:
+                s += "\n" + _(t)
+            return s
+
+        def redo_tip():
+            s = _("Redo last operation")
+            t = kernel.elements.undo.redo_string()
+            if t:
+                s += "\n" + _(t)
+            return s
+
         kernel.register(
             "button/undo/Undo",
             {
                 "label": _("Undo"),
                 "icon": icon_mk_undo,
-                "tip": _("Undo last operation"),
+                "tip": undo_tip,
                 "help": "basicediting",
                 "action": lambda v: kernel.elements("undo\n"),
                 "size": bsize_small,
@@ -2115,7 +2134,7 @@ class MeerK40t(MWindow):
             {
                 "label": _("Redo"),
                 "icon": icon_mk_redo,
-                "tip": _("Redo last operation"),
+                "tip": redo_tip,
                 "help": "basicediting",
                 "action": lambda v: kernel.elements("redo\n"),
                 "size": bsize_small,
@@ -2810,8 +2829,10 @@ class MeerK40t(MWindow):
                 try:
                     context.elements.save(pathname, version=version)
                     gui.validate_save()
+                    # Now just a single file...
+                    self.working_files.clear()
                     self.set_working_file_name(pathname)
-                    gui.set_file_as_recently_used(gui.working_file)
+                    gui.set_file_as_recently_used(gui.working_files[0])
                 except OSError as e:
                     dlg = wx.MessageDialog(
                         None,
@@ -2828,19 +2849,19 @@ class MeerK40t(MWindow):
         @context.console_option("quit", "q", action="store_true", type=bool)
         @context.console_command("dialog_save", hidden=True)
         def save_or_save_as(quit=False, **kwargs):
-            if gui.working_file is None or self.files_loaded > 1:
+            if len(gui.working_files) != 1:
                 if quit:
                     context(".dialog_save_as -q\n")
                 else:
                     context(".dialog_save_as\n")
             else:
                 try:
-                    gui.set_file_as_recently_used(gui.working_file)
+                    gui.set_file_as_recently_used(gui.working_files[0])
                     gui.validate_save()
-                    context.elements.save(gui.working_file)
+                    context.elements.save(gui.working_files[0])
                     context.signal(
                         "statusmsg",
-                        _("Succesfully saved {file}").format(file=gui.working_file),
+                        _("Succesfully saved {file}").format(file=gui.working_files[0]),
                     )
                 except OSError as e:
                     dlg = wx.MessageDialog(
@@ -4625,7 +4646,12 @@ class MeerK40t(MWindow):
         self.main_statusbar.Reposition(value)
 
     def __set_titlebar(self):
-        label = self.working_file
+        if len(self.working_files) > 1:
+            label = _(MULTIPLE)
+        elif len(self.working_files) == 1:
+            label = self.working_files[0]
+        else:
+            label = None
         if label is None:
             label = ""
         else:
@@ -4654,14 +4680,10 @@ class MeerK40t(MWindow):
 
     def set_working_file_name(self, fname):
         if fname is None:
-            self.working_file = fname
-            self.files_loaded = 0
+            self.working_files.clear()
         else:
-            self.files_loaded += 1
-            if self.files_loaded == 1:
-                self.working_file = fname
-            else:
-                self.working_file = _("<Multiple files loaded>")
+            if fname not in self.working_files:
+                self.working_files.append(fname)
 
     def load_or_open(self, filename):
         """
@@ -4712,31 +4734,21 @@ class MeerK40t(MWindow):
             return  # No menu, cannot populate.
 
         context = self.context
-        recents = [
-            (context.file0, "&1 "),
-            (context.file1, "&2 "),
-            (context.file2, "&3 "),
-            (context.file3, "&4 "),
-            (context.file4, "&5 "),
-            (context.file5, "&6 "),
-            (context.file6, "&7 "),
-            (context.file7, "&8 "),
-            (context.file8, "&9 "),
-            (context.file9, "1&0"),
-            (context.file10, "11"),
-            (context.file11, "12"),
-            (context.file12, "13"),
-            (context.file13, "14"),
-            (context.file14, "15"),
-            (context.file15, "16"),
-            (context.file16, "17"),
-            (context.file17, "18"),
-            (context.file18, "19"),
-            (context.file19, "20"),
-        ]
-
-        # for i in range(self.recent_file_menu.MenuItemCount):
-        # self.recent_file_menu.Remove(self.recent_file_menu.FindItemByPosition(0))
+        recents = []
+        idx = 0
+        for i in range(20):
+            fname = getattr(context, f"file{i}")
+            if fname is None or fname == "":
+                continue
+            if os.path.exists(fname):
+                idx += 1
+                if idx < 10:
+                    label = f"&{idx} "
+                elif idx == 10:
+                    label = f"1&0 "
+                else:
+                    label = f"{idx} "
+                recents.append( (fname, label) )
 
         for item in self.recent_file_menu.GetMenuItems():
             self.recent_file_menu.Remove(item)
@@ -4776,9 +4788,14 @@ class MeerK40t(MWindow):
         self.populate_recent_menu()
 
     def set_file_as_recently_used(self, pathname):
+        if pathname == MULTIPLE or pathname == _(MULTIPLE):
+            return
         recent = list()
         for i in range(20):
-            recent.append(getattr(self.context, "file" + str(i)))
+            s = getattr(self.context, "file" + str(i))
+            if s == MULTIPLE or s == _(MULTIPLE):
+                continue
+            recent.append(s)
         recent = [r for r in recent if r is not None and r != pathname and len(r) > 0]
         recent.insert(0, pathname)
         for i in range(20):
@@ -4799,7 +4816,8 @@ class MeerK40t(MWindow):
         self.validate_save()
         kernel.busyinfo.end()
         self.context(".tool none\n")
-        context.elements.undo.mark("blank")
+        # Hint for translate check: _("Clear Project")
+        context.elements.undo.mark("Clear Project")
         self.context.signal("selected")
 
     def clear_and_open(self, pathname, preferred_loader=None):
@@ -5002,6 +5020,7 @@ class MeerK40t(MWindow):
                 self.context(f"scene focus -{zl}% -{zl}% {100 + zl}% {100 + zl}%\n")
 
                 self.set_file_as_recently_used(pathname)
+                self.set_working_file_name(pathname)
                 if n != self.context.elements.note and self.context.elements.auto_note:
                     self.context("window open Notes\n")  # open/not toggle.
                 return True
@@ -5170,9 +5189,38 @@ class MeerK40t(MWindow):
         self.DoGiveHelp_called = True
 
     def on_menu_open(self, event):
+        def undo_label():
+            s = _("&Undo\tCtrl-Z")
+            t = self.context.elements.undo.undo_string()
+            if t:
+                idx = s.find("\t")
+                if idx:
+                    s = s[:idx] + " " + _(t) + s[idx:]
+                else:
+                    s += " " + _(t)
+            return s
+
+        def redo_label():
+            s = _("&Redo\tCtrl-Shift-Z")
+            t = self.context.elements.undo.redo_string()
+            if t:
+                idx = s.find("\t")
+                if idx:
+                    s = s[:idx] + " " + _(t) + s[idx:]
+                else:
+                    s += " " + _(t)
+            return s
+
         self.menus_open += 1
         menu = event.GetMenu()
         if menu:
+            if menu is self.edit_menu:
+                item, pos = menu.FindChildItem(wx.ID_UNDO)
+                if item:
+                    item.SetItemLabel(undo_label())
+                item, pos = menu.FindChildItem(wx.ID_REDO)
+                if item:
+                    item.SetItemLabel(redo_label())
             title = menu.GetTitle()
             if title:
                 self.update_statusbar(title + "...")
@@ -5211,3 +5259,54 @@ class MeerK40t(MWindow):
     @signal_listener("started")
     def on_signal_started(self, *args):
         self.context.kernel.busyinfo.end()
+        self.check_for_crash()
+
+    def check_for_crash(self):
+
+        safe_dir:str = os.path.realpath(get_safe_path(APPLICATION_NAME))
+        crash_indicator:str = os.path.join(safe_dir, "_crash")
+        recovery_file:str = self.autosave.autosave_file
+        # Is there a crash-indicator? The we look for the latest autosave - file
+        if os.path.exists(crash_indicator) and os.path.exists(recovery_file):
+            try:
+                filedate = datetime.datetime.fromtimestamp(os.path.getmtime(recovery_file))
+                recovery_date = filedate.isoformat(" ")
+            except (
+                    PermissionError,
+                    OSError,
+                    RuntimeError,
+                    FileExistsError,
+                    FileNotFoundError,
+                ) as e:
+                    # print (f"Error happened: {e}")
+                    pass
+            except Exception as e:
+                recovery_date = "???"
+
+            message = _("Apparently MeerK40t did crash during the last session, we apologize for this invconvenience.") + "\n"
+            message += _("There is an autosave file ({filename}),\nthat was last saved at {filedate}.").format(filename=recovery_file, filedate=recovery_date) + "\n"
+            message += _("Do you want to load this file?")
+            caption = _("Crash-Recovery")
+            recover =  self.context.kernel.yesno(
+                message,
+                option_yes=_("Load work"),
+                option_no=_("Start fresh"),
+                caption=caption,
+            )
+            # Now remove the crash indicator
+            try:
+                os.remove(crash_indicator)
+            except (
+                    PermissionError,
+                    OSError,
+                    RuntimeError,
+                    FileExistsError,
+                    FileNotFoundError,
+                ) as e:
+                    # print (f"Error happened: {e}")
+                    pass
+            if recover:
+                # Load file
+                self.context(f'load "{recovery_file}"\n')
+                self.set_needs_save_status(True)
+                
