@@ -357,7 +357,13 @@ class MeerK40t(MWindow):
             self.Maximize()
         if hasattr(kernel.args, "minimized") and kernel.args.minimized:
             self.Iconize()
+        self.Bind(wx.EVT_ACTIVATE, self.on_active)
 
+    def on_active(self, event):
+        if event.GetActive():
+            self.context.signal("scene_activated")
+        else:
+            self.context.signal("scene_deactivated")
 
     def tips_at_startup(self):
         self.context.setting(bool, "show_tips", True)
@@ -1379,9 +1385,9 @@ class MeerK40t(MWindow):
         @param node:
         @return:
         """
-        gui = self
-        root = self.context.root
-        root.open("window/Properties", gui)
+        # print(f"Calling property for {node.type}")
+        self.context.elements.set_emphasis([node])
+        self.context("window open Properties\n")
 
     @staticmethod
     def sub_register(kernel):
@@ -2872,6 +2878,17 @@ class MeerK40t(MWindow):
                     )
                     dlg.ShowModal()
                     dlg.Destroy()
+
+        @context.console_option("ops_too", "o", action="store_true", type=bool)
+        @context.console_command("clear_project")
+        def reset_workspace(command, channel, ops_too=False, **kwargs):
+            self.set_working_file_name(None)
+            self.context.elements.clear_all(ops_too=ops_too)
+            self.context(".planz clear\n")
+            self.context(".laserpath_clear\n")
+            self.validate_save()
+            self.context(".tool none\n")
+            self.context.elements.undo.mark("Clear Project")
 
     def __set_panes(self):
         self.context.setting(bool, "pane_lock", False)
@@ -4369,6 +4386,7 @@ class MeerK40t(MWindow):
                 "size": STD_ICON_SIZE,
             },
         )
+        self.context.root.signal("page", "home")
 
     @signal_listener("file;loaded")
     @signal_listener("file;saved")
@@ -4809,15 +4827,10 @@ class MeerK40t(MWindow):
         context = self.context
         kernel = context.kernel
         kernel.busyinfo.start(msg=_("Cleaning up..."))
-        self.set_working_file_name(None)
-        context.elements.clear_all(ops_too=ops_too)
-        context("planz clear\n")
-        self.context(".laserpath_clear\n")
-        self.validate_save()
+        options = " -o" if ops_too else ""
+        self.context(f".clear_project{options}\n")
         kernel.busyinfo.end()
-        self.context(".tool none\n")
         # Hint for translate check: _("Clear Project")
-        context.elements.undo.mark("Clear Project")
         self.context.signal("selected")
 
     def clear_and_open(self, pathname, preferred_loader=None):
@@ -5309,4 +5322,4 @@ class MeerK40t(MWindow):
                 # Load file
                 self.context(f'load "{recovery_file}"\n')
                 self.set_needs_save_status(True)
-                
+

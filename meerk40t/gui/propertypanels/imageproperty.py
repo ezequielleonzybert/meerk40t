@@ -839,7 +839,6 @@ class ImageVectorisationPanel(ScrolledPanel):
 
         self.wximage = wx.NullBitmap
         self.wxvector = wx.NullBitmap
-        self._visible = False
 
         self.Layout()
         self.Centre()
@@ -866,11 +865,10 @@ class ImageVectorisationPanel(ScrolledPanel):
         self.set_images(True)
 
     def pane_active(self):
-        self._visible = True
         self.set_images(True)
 
     def pane_deactive(self):
-        self._visible = False
+        pass
 
     def on_changes(self, event):
         # self._need_updates = True
@@ -908,7 +906,7 @@ class ImageVectorisationPanel(ScrolledPanel):
                     img = background
             return img
 
-        if not self._visible:
+        if not self.IsShown():
             return
         if self.node is None or self.node.image is None:
             self.wximage = wx.NullBitmap
@@ -939,7 +937,7 @@ class ImageVectorisationPanel(ScrolledPanel):
         make_vector = self.context.kernel.lookup("render-op/make_vector")
         make_raster = self.context.kernel.lookup("render-op/make_raster")
         # while self.alive:
-        if not self._visible:
+        if not self.IsShown():
             return
         self.wxvector = wx.NullBitmap
 
