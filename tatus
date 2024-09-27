@@ -1,0 +1,69 @@
+[1mdiff --git a/linux.txt b/linux.txt[m
+[1mdeleted file mode 100644[m
+[1mindex 605057540..000000000[m
+[1m--- a/linux.txt[m
+[1m+++ /dev/null[m
+[36m@@ -1,15 +0,0 @@[m
+[31m-For the Linux afficionados:[m
+[31m-[m
+[31m-1) pypotrace is used for faster bitmap vectorisation - I was able to install it via[m
+[31m-[m
+[31m-	sudo apt install libagg-dev libpotrace-dev[m
+[31m-	pip3 install pypotrace[m
+[31m-[m
+[31m-[m
+[31m-2) pyclipr (used for faster and better offset calculation eg with kerf) needed[m
+[31m-[m
+[31m-	sudo apt install cmake libeigen3-dev[m
+[31m-	pip3 install pyclipr[m
+[31m-[m
+[31m-3) If you need to build wxpython yourself, you need to install the gtk development libraries[m
+[31m-	sudo apt install libgtk-3-dev[m
+[1mdiff --git a/meerk40t.py b/meerk40t.py[m
+[1mdeleted file mode 100644[m
+[1mindex 95e7133bb..000000000[m
+[1m--- a/meerk40t.py[m
+[1m+++ /dev/null[m
+[36m@@ -1,11 +0,0 @@[m
+[31m-#!/usr/bin/env python[m
+[31m-[m
+[31m-[m
+[31m-import re[m
+[31m-import sys[m
+[31m-[m
+[31m-from meerk40t import main[m
+[31m-[m
+[31m-if __name__ == "__main__":[m
+[31m-    sys.argv[0] = re.sub(r"(-script\.pyw|\.exe)?$", "", sys.argv[0])[m
+[31m-    sys.exit(main.run())[m
+[1mdiff --git a/meerk40t/gui/ribbon.py b/meerk40t/gui/ribbon.py[m
+[1mindex 63be8eb10..4ea133242 100644[m
+[1m--- a/meerk40t/gui/ribbon.py[m
+[1m+++ b/meerk40t/gui/ribbon.py[m
+[36m@@ -773,7 +773,7 @@[m [mclass RibbonBarPanel(wx.Control):[m
+         self._redraw_job = Job([m
+             process=self._paint_main_on_buffer,[m
+             job_name=jobname,[m
+[31m-            interval=0.1,[m
+[32m+[m[32m            interval=0,[m
+             times=1,[m
+             run_main=True,[m
+         )[m
+[1mdiff --git a/meerk40t/gui/wxmeerk40t.py b/meerk40t/gui/wxmeerk40t.py[m
+[1mindex 66e0a8061..4585ea845 100644[m
+[1m--- a/meerk40t/gui/wxmeerk40t.py[m
+[1m+++ b/meerk40t/gui/wxmeerk40t.py[m
+[36m@@ -471,10 +471,10 @@[m [mclass wxMeerK40t(wx.App, Module):[m
+         # Set the delay after which the tooltip appears.[m
+         self.context.setting(int, "tooltip_delay", 100)[m
+         autopop_ms = self.context.tooltip_autopop[m
+[31m-        delay_ms = self.context.tooltip_delay[m
+[32m+[m[32m        delay_ms = 1500 #self.context.tooltip_delay[m
+         wx.ToolTip.SetAutoPop(autopop_ms)[m
+[31m-        wx.ToolTip.SetDelay(delay_ms)[m
+[31m-        wx.ToolTip.SetReshow(0)[m
+[32m+[m[32m        wx.ToolTip.SetDelay(1500)[m
+[32m+[m[32m        wx.ToolTip.SetReshow(1500) #There's a bug with this[m
+ [m
+     def on_app_close(self, event=None):[m
+         try:[m
