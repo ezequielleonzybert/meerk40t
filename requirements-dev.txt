@@ -1,0 +1,10 @@
+numpy
+wheel
+Pillow
+pyusb
+wxPython
+ezdxf
+opencv-python-headless
+pytest
+flake8
+polib
